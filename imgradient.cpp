@@ -15,7 +15,12 @@ namespace ImGradient
 {
 static void Checkerboard(ImDrawList* draw_list, ImRect rect);
 static void Gradient(ImDrawList* draw_list, ImRect rect);
-static bool Marker(ImDrawList* draw_list, ImRect rect, ImVec2 marker_size, float position);
+static bool Marker(
+    ImDrawList* draw_list,
+    ImRect      rect,
+    ImVec2      marker_size,
+    float       position,
+    bool        is_selected);
 
 const ImVector<ImGradientMarker>& GradientPicker(const char* label, ImGradientPickerFlags flags)
 {
@@ -50,7 +55,7 @@ const ImVector<ImGradientMarker>& GradientPicker(const char* label, ImGradientPi
     }
 
     ImGui::PushID(i);
-    if (Marker(d, gradient_rect, marker_size, picker.Markers[i].Position))
+    if (Marker(d, gradient_rect, marker_size, picker.Markers[i].Position, false))
     {
       dragging_marker = true;
       new_selected_idx = i;
@@ -59,7 +64,7 @@ const ImVector<ImGradientMarker>& GradientPicker(const char* label, ImGradientPi
   }
 
   ImGui::PushID(picker.SelectedIdx);
-  if (Marker(d, gradient_rect, marker_size, picker.Markers[picker.SelectedIdx].Position))
+  if (Marker(d, gradient_rect, marker_size, picker.Markers[picker.SelectedIdx].Position, true))
   {
     dragging_marker = true;
     new_selected_idx = picker.SelectedIdx;
@@ -176,29 +181,65 @@ ImGradientPicker& GetCurrentPicker()
   return g.Pickers[picker_idx];
 }
 
-void AddColor() {}
+void AddColor()
+{
+  ImGradientPicker& picker = GetCurrentPicker();
 
-void RemoveColor() {}
+  if (picker.Markers.size() == 1)
+  {
+    const ImVec4& color = picker.Markers[picker.SelectedIdx].Color;
+  }
+
+  const ImVec4& color1 = picker.Markers[picker.SelectedIdx].Color;
+  float         position1 = picker.Markers[picker.SelectedIdx].Position;
+
+  const ImVec4& color2 = picker.SelectedIdx == 0 ? picker.Markers[picker.SelectedIdx + 1].Color
+                                                 : picker.Markers[picker.SelectedIdx - 1].Color;
+  float position2 = picker.SelectedIdx == 0 ? picker.Markers[picker.SelectedIdx + 1].Position
+                                            : picker.Markers[picker.SelectedIdx - 1].Position;
+
+  ImVec4 insert_color = ImVec4(
+      color1.x - (color2.x - color1.x) * 0.5f,
+      color1.y - (color2.y - color1.y) * 0.5f,
+      color1.z - (color2.z - color1.z) * 0.5f,
+      color1.w - (color2.w - color1.w) * 0.5f);
+  float insert_position = position1 - (position2 - position1) * 0.5f;
+
+  picker.Markers.insert(
+      picker.Markers.begin() + picker.SelectedIdx, ImGradientMarker{insert_color, insert_position});
+}
+
+void RemoveColor()
+{
+  ImGradientPicker& picker = GetCurrentPicker();
+
+  IM_ASSERT(picker.Markers.size() > 1);
+
+  picker.Markers.erase(picker.Markers.begin() + picker.SelectedIdx);
+
+  if (picker.SelectedIdx == picker.Markers.size())
+  {
+    picker.SelectedIdx -= 1;
+  }
+}
 
 void SortMarkers()
 {
   ImGradientPicker& picker = GetCurrentPicker();
 
-  float position = picker.Markers[picker.SelectedIdx].Position;
+  ImGradientMarker moved = picker.Markers[picker.SelectedIdx];
+  picker.Markers.erase(picker.Markers.begin() + picker.SelectedIdx);
 
-  std::sort(
+  auto it = std::lower_bound(
       picker.Markers.begin(),
       picker.Markers.end(),
-      [](const ImGradientMarker& a, const ImGradientMarker& b) { return a.Position < b.Position; });
+      moved.Position,
+      [](const ImGradientMarker& a, float value) { return a.Position < value; });
 
-  for (int i = 0; i < picker.Markers.size(); i++)
-  {
-    if (picker.Markers[i].Position == position)
-    {
-      picker.SelectedIdx = i;
-      break;
-    }
-  }
+  int new_idx = (int)(it - picker.Markers.begin());
+
+  picker.Markers.insert(it, moved);
+  picker.SelectedIdx = new_idx;
 }
 
 static void Checkerboard(ImDrawList* draw_list, ImRect rect)
@@ -269,7 +310,12 @@ static void Gradient(ImDrawList* draw_list, ImRect rect)
   }
 }
 
-static bool Marker(ImDrawList* draw_list, ImRect rect, ImVec2 marker_size, float position)
+static bool Marker(
+    ImDrawList* draw_list,
+    ImRect      rect,
+    ImVec2      marker_size,
+    float       position,
+    bool        is_selected)
 {
   float gradient_height = rect.Max.y - rect.Min.y;
   float offset_y = rect.Min.y + gradient_height * 0.75f;
@@ -284,6 +330,27 @@ static bool Marker(ImDrawList* draw_list, ImRect rect, ImVec2 marker_size, float
   ImVec2 tri_p1(center_x, offset_y);
   ImVec2 tri_p2(center_x - tri_width * 0.5f, offset_y + gradient_height * 0.35f);
   ImVec2 tri_p3(center_x + tri_width * 0.5f, offset_y + gradient_height * 0.35f);
+
+  if (is_selected)
+  {
+    draw_list->AddLine(
+        ImVec2(tri_p1.x, tri_p1.y),
+        ImVec2(center_x, tri_p1.y - 3.0f),
+        IM_COL32(255, 255, 255, 255),
+        thickness);
+
+    draw_list->AddLine(
+        ImVec2(tri_p1.x, tri_p1.y - 6.0f),
+        ImVec2(center_x, tri_p1.y - 9.0f),
+        IM_COL32(255, 255, 255, 255),
+        thickness);
+
+    draw_list->AddLine(
+        ImVec2(tri_p1.x, tri_p1.y - 12.0f),
+        ImVec2(center_x, tri_p1.y - 15.0f),
+        IM_COL32(255, 255, 255, 255),
+        thickness);
+  }
 
   draw_list->AddTriangleFilled(tri_p1, tri_p2, tri_p3, IM_COL32(255, 255, 255, 255));
   draw_list->AddTriangle(tri_p1, tri_p2, tri_p3, IM_COL32(100, 100, 100, 255), thickness);
