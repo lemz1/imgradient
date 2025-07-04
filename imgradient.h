@@ -3,39 +3,32 @@
 #include <imgui.h>
 
 struct ImGradientContext;
-struct ImGradientIO;
-struct ImGradientRGB;
-struct ImGradientRGBA;
+struct ImGradientMarker;
+
+typedef int ImGradientPickerFlags; // -> enum ImGradientPickerFlags_
 
 // clang-format off
-enum ImGradientPickerFlags
+enum ImGradientPickerFlags_
 {
-  ImGradientPickerFlags_None          = 0,
-  ImGradientPickerFlags_NoAlpha       = 1 << 0, // Disable alpha channel
-  ImGradientPickerFlags_NoAdd         = 1 << 1, // Disable adding new colors
-  ImGradientPickerFlags_NoRemove      = 1 << 2, // Disable removing colors
-  ImGradientPickerFlags_NoReposition  = 1 << 3, // Disable repositioning colors
+  ImGradientPickerFlags_None       = 0,
+  ImGradientPickerFlags_NoAlpha    = 1 << 0, // Disable alpha channel
+  ImGradientPickerFlags_NoAddding  = 1 << 1, // Disable adding new markers
+  ImGradientPickerFlags_NoRemoving = 1 << 2, // Disable removing markers
+  ImGradientPickerFlags_NoMoving   = 1 << 3, // Disable moving markers
 };
 // clang-format on
-
-struct ImGradientIO
-{
-};
 
 namespace ImGradient
 {
 ImGradientContext* CreateContext();
 void               DestroyContext();
 ImGradientContext* GetCurrentContext();
-void               SetCurrentContext(ImGradientContext* ctx);
 
-// returns true if the gradient picker is interacted with
-// ImGradientPickerFlags_NoAlpha: 3 floats per color instead of 4
-bool GradientPicker(
-    int                   count,
-    const float*          colors,
-    const float*          positions,
+// returns a vector containing the markers in ascending order
+const ImVector<ImGradientMarker>& GradientPicker(
+    const char*           label,
     ImGradientPickerFlags flags = ImGradientPickerFlags_None);
 
-void GetRepositionedIndex(int* prev_color_idx, int* new_color_idx);
+// Use this to add initial markers to a gradient picker
+void AddNextGradientPickerMarker(ImVec4 color, float position);
 } // namespace ImGradient

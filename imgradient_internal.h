@@ -1,15 +1,38 @@
 #pragma once
 
+#include <imgui.h>
 #include "imgradient.h"
 
-struct ImGradientContext;
-struct ImGradientPicker;
+struct ImGradientMarker
+{
+  ImVec4 Color;
+  float  Position;
+};
+
+struct ImGradientPicker
+{
+  ImVector<ImGradientMarker> Markers;
+  int                        SelectedIdx;
+};
 
 struct ImGradientContext
 {
-  bool         Initialized = false;
-  ImGradientIO IO;
+  bool IsDraggingMarker = false;
 
-  int PrevColorIdx;
-  int NewColorIdx;
+  ImGuiID                    CurrentPicker;
+  ImVector<ImGradientPicker> Pickers;
+  ImGuiStorage               IdToPickerIdx;
+  ImGradientPickerFlags      PickerFlags;
+
+  ImVector<ImGradientMarker> NextMarkers;
 };
+
+namespace ImGradient
+{
+ImGradientPicker& GetOrCreatePicker(ImGuiID id);
+ImGradientPicker& GetCurrentPicker();
+
+void AddColor();
+void RemoveColor();
+void SortMarkers();
+} // namespace ImGradient

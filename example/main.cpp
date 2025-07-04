@@ -30,23 +30,6 @@ int main()
   ImGui_ImplGlfw_InitForOpenGL(window, true);
   ImGui_ImplOpenGL3_Init("#version 330 core");
 
-  float colors[] = {
-      1.0f,
-      0.0f,
-      0.0f,
-      1.0f,
-      0.0f,
-      0.0f,
-      0.0f,
-      0.0f,
-      0.0f,
-      0.0f,
-      1.0f,
-      1.0f,
-  };
-
-  float positions[] = {0.0f, 0.5f, 1.0f};
-
   while (!glfwWindowShouldClose(window))
   {
     glfwPollEvents();
@@ -59,7 +42,10 @@ int main()
     ImGui::DockSpaceOverViewport();
 
     ImGui::Begin("Gradient Picker");
-    ImGradient::GradientPicker(3, colors, positions);
+    ImGradient::AddNextGradientPickerMarker(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), 0.0f);
+    ImGradient::AddNextGradientPickerMarker(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), 0.5f);
+    ImGradient::AddNextGradientPickerMarker(ImVec4(0.0f, 0.0f, 1.0f, 1.0f), 1.0f);
+    ImGradient::GradientPicker("Picker");
     ImGui::End();
 
     ImGui::Render();
