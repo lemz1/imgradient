@@ -292,13 +292,22 @@ ImGradientPicker& GetOrCreatePicker(ImGuiID id)
     ImGradientPicker& picker = g.Pickers[g.Pickers.size() - 1];
     if (g.NextMarkers.size() > 0)
     {
-      if ((g.PickerFlags & ImGradientPickerFlags_NoAlpha) != 0)
+      for (int i = 0; i < g.NextMarkers.size(); i++)
       {
-        for (ImGradientMarker& marker : g.NextMarkers)
+        if ((g.PickerFlags & ImGradientPickerFlags_NoAlpha) != 0)
         {
-          IM_ASSERT(marker.Color.w == 1.0f);
+          IM_ASSERT_USER_ERROR(
+              g.NextMarkers[i].Color.w == 1.0f, "Alpha needs to be 1.0f when disabling alpha");
+        }
+
+        if (i > 0)
+        {
+          IM_ASSERT_USER_ERROR(
+              g.NextMarkers[i - 1].Position < g.NextMarkers[i].Position,
+              "The initial markers have to be in ascending order");
         }
       }
+
       picker.Markers = g.NextMarkers;
     }
     else
@@ -384,7 +393,7 @@ void RemoveColor(int idx)
 {
   ImGradientPicker& picker = GetCurrentPicker();
 
-  IM_ASSERT(picker.Markers.size() > 1);
+  IM_ASSERT_USER_ERROR(picker.Markers.size() > 1, "Atleast one marker needs to exist");
 
   picker.Markers.erase(picker.Markers.begin() + idx);
 
