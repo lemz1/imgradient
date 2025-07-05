@@ -3,12 +3,6 @@
 #include <imgui.h>
 #include "imgradient.h"
 
-struct ImGradientMarker
-{
-  ImVec4 Color;
-  float  Position;
-};
-
 struct ImGradientPicker
 {
   ImVector<ImGradientMarker> Markers;

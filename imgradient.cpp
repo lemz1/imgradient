@@ -1,6 +1,6 @@
 #include "imgradient.h"
 
-#include "imgui_internal.h"
+#include <imgui_internal.h>
 
 #include <cmath>
 #include <glfw/glfw3.h>
@@ -31,7 +31,60 @@ const ImVector<ImGradientMarker>& GradientPicker(const char* label, ImGradientPi
 
   ImGradientPicker& picker = GetOrCreatePicker(ImGui::GetID(label));
 
+  bool no_alpha = (flags & ImGradientPickerFlags_NoAlpha) != 0;
+  bool no_adding = (flags & ImGradientPickerFlags_NoAdding) != 0;
+  bool no_removing = picker.Markers.size() == 1 || (flags & ImGradientPickerFlags_NoRemoving) != 0;
+  bool no_moving = (flags & ImGradientPickerFlags_NoMoving) != 0;
+  bool no_coloring = (flags & ImGradientPickerFlags_NoColoring) != 0;
+
+  float button_size = ImGui::GetFrameHeight();
+  if (no_removing)
+  {
+    ImGui::BeginDisabled();
+  }
+  if (ImGui::Button("-", ImVec2(button_size, button_size)))
+  {
+    RemoveColor(picker.SelectedIdx);
+  }
+  if (no_removing)
+  {
+    ImGui::EndDisabled();
+  }
+  ImGui::SameLine();
+  if (no_adding)
+  {
+    ImGui::BeginDisabled();
+  }
+  if (ImGui::Button("+", ImVec2(button_size, button_size)))
+  {
+    if (picker.Markers.size() == 1)
+    {
+      if (picker.Markers[picker.SelectedIdx].Position != 1.0f)
+      {
+        AddColor(1.0f);
+      }
+      else
+      {
+        AddColor(0.0f);
+      }
+    }
+    else
+    {
+      float position1 = picker.Markers[picker.SelectedIdx].Position;
+      float position2 = picker.SelectedIdx == 0 ? picker.Markers[picker.SelectedIdx + 1].Position
+                                                : picker.Markers[picker.SelectedIdx - 1].Position;
+      AddColor((position1 + position2) * 0.5f);
+    }
+  }
+  if (no_adding)
+  {
+    ImGui::EndDisabled();
+  }
+  ImGui::SameLine();
+  ImGui::Text(label);
+
   ImVec2 cursor_pos = ImGui::GetCursorScreenPos();
+  cursor_pos.y += 2.0f;
   ImVec2 gradient_size = ImVec2(ImGui::GetContentRegionAvail().x, 20.0f);
 
   ImVec2 marker_size = ImVec2(gradient_size.y * 0.6f, gradient_size.y * 0.6f);
@@ -73,15 +126,14 @@ const ImVector<ImGradientMarker>& GradientPicker(const char* label, ImGradientPi
 
   if (!g.IsDraggingMarker && new_selected_idx != -1)
   {
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::GetIO().KeyCtrl &&
-        picker.Markers.size() > 1)
+    if (!no_removing && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::GetIO().KeyCtrl)
     {
       RemoveColor(new_selected_idx);
     }
     else if (!ImGui::GetIO().KeyCtrl)
     {
       picker.SelectedIdx = new_selected_idx;
-      g.IsDraggingMarker = dragging_marker;
+      g.IsDraggingMarker = dragging_marker && !no_moving;
     }
   }
 
@@ -120,8 +172,8 @@ const ImVector<ImGradientMarker>& GradientPicker(const char* label, ImGradientPi
   bool hovered_gradient;
   ImGui::ButtonBehavior(gradient_rect, g.CurrentPicker, &hovered_gradient, NULL);
 
-  if (hovered_gradient && !g.IsDraggingMarker && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
-      ImGui::GetIO().KeyShift)
+  if (!no_adding && hovered_gradient && !g.IsDraggingMarker &&
+      ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::GetIO().KeyShift)
   {
     float position = (ImGui::GetIO().MousePos.x - gradient_rect.Min.x) /
                      (gradient_rect.Max.x - gradient_rect.Min.x);
@@ -133,12 +185,75 @@ const ImVector<ImGradientMarker>& GradientPicker(const char* label, ImGradientPi
     g.IsDraggingMarker = false;
   }
 
+  ImGui::SetNextItemWidth(75.0f);
+  if (ImGui::InputInt("##Marker Index", &picker.SelectedIdx, 1, 1))
+  {
+    picker.SelectedIdx =
+        (picker.SelectedIdx < 0
+             ? 0
+             : (picker.SelectedIdx >= picker.Markers.size() ? picker.Markers.size() - 1
+                                                            : picker.SelectedIdx));
+  }
+
+  ImGui::SameLine();
+
+  if (no_moving)
+  {
+    ImGui::BeginDisabled();
+  }
+  ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+  if (ImGui::DragFloat(
+          "##Marker Position", &picker.Markers[picker.SelectedIdx].Position, 0.001f, 0.0f, 1.0f))
+  {
+    if ((picker.SelectedIdx - 1 >= 0 && picker.Markers[picker.SelectedIdx - 1].Position >
+                                            picker.Markers[picker.SelectedIdx].Position) ||
+        (picker.SelectedIdx + 1 < picker.Markers.size() &&
+         picker.Markers[picker.SelectedIdx + 1].Position <
+             picker.Markers[picker.SelectedIdx].Position))
+    {
+      SortMarkers();
+    }
+  }
+  if (no_moving)
+  {
+    ImGui::EndDisabled();
+  }
+
+  if (no_coloring)
+  {
+    ImGui::BeginDisabled();
+  }
+  if (ImGui::ColorButton(
+          "##Marker Color",
+          picker.Markers[picker.SelectedIdx].Color,
+          0,
+          ImVec2(ImGui::GetContentRegionAvail().x, 20)))
+  {
+    ImGui::OpenPopup("Marker Popup");
+    ImVec2 bl = ImGui::GetCurrentContext()->LastItemData.Rect.GetBL();
+    ImGui::SetNextWindowPos(ImVec2(bl.x, bl.y + ImGui::GetStyle().ItemSpacing.y));
+  }
+  if (no_coloring)
+  {
+    ImGui::EndDisabled();
+  }
+
+  if (ImGui::BeginPopup("Marker Popup"))
+  {
+    ImGui::SetNextItemWidth(200.0f);
+    ImGui::ColorPicker4(
+        "##Color Picker",
+        (float*)&picker.Markers[picker.SelectedIdx].Color,
+        no_alpha ? ImGuiColorEditFlags_NoAlpha : ImGuiColorEditFlags_AlphaBar);
+    ImGui::EndPopup();
+  }
+
   g.NextMarkers.resize(0);
 
   return picker.Markers;
 }
 
-void AddNextGradientPickerMarker(ImVec4 color, float position)
+void AddNextMarker(ImVec4 color, float position)
 {
   ImGradientContext& g = *ImGradient::GetCurrentContext();
 
@@ -177,6 +292,13 @@ ImGradientPicker& GetOrCreatePicker(ImGuiID id)
     ImGradientPicker& picker = g.Pickers[g.Pickers.size() - 1];
     if (g.NextMarkers.size() > 0)
     {
+      if ((g.PickerFlags & ImGradientPickerFlags_NoAlpha) != 0)
+      {
+        for (ImGradientMarker& marker : g.NextMarkers)
+        {
+          IM_ASSERT(marker.Color.w == 1.0f);
+        }
+      }
       picker.Markers = g.NextMarkers;
     }
     else
@@ -366,6 +488,8 @@ static bool Marker(
     float       position,
     bool        is_selected)
 {
+  ImGradientPicker& picker = GetCurrentPicker();
+
   float gradient_height = rect.Max.y - rect.Min.y;
   float offset_y = rect.Min.y + gradient_height * 0.75f;
 
@@ -382,24 +506,28 @@ static bool Marker(
 
   if (is_selected)
   {
+    const ImVec4& color = picker.Markers[picker.SelectedIdx].Color;
+    float         brightness = (0.299f * color.x + 0.587f * color.y + 0.114f * color.z);
+
+    ImU32 line_color = brightness > 0.5f ? IM_COL32_BLACK : IM_COL32_WHITE;
     float line_offset = gradient_height * 0.15f;
 
     draw_list->AddLine(
         ImVec2(tri_p1.x, tri_p1.y),
         ImVec2(center_x, tri_p1.y - line_offset),
-        IM_COL32(255, 255, 255, 255),
+        line_color,
         thickness);
 
     draw_list->AddLine(
         ImVec2(tri_p1.x, tri_p1.y - line_offset * 2.0f),
         ImVec2(center_x, tri_p1.y - line_offset * 3.0f),
-        IM_COL32(255, 255, 255, 255),
+        line_color,
         thickness);
 
     draw_list->AddLine(
         ImVec2(tri_p1.x, tri_p1.y - line_offset * 4.0f),
         ImVec2(center_x, tri_p1.y - line_offset * 5.0f),
-        IM_COL32(255, 255, 255, 255),
+        line_color,
         thickness);
   }
 
