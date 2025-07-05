@@ -40,6 +40,6 @@ const ImVector<ImGradientMarker>& GradientPicker(
     const char*           label,
     ImGradientPickerFlags flags = ImGradientPickerFlags_None);
 
-// Use this to add initial markers to a gradient picker
-void AddNextMarker(ImVec4 color, float position);
+// Use this to add initial markers to the next gradient picker
+void AddInitialMarker(ImVec4 color, float position);
 } // namespace ImGradient

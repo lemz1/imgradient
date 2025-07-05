@@ -42,9 +42,9 @@ int main()
     ImGui::DockSpaceOverViewport();
 
     ImGui::Begin("Gradient Picker");
-    ImGradient::AddNextMarker(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), 0.0f);
-    ImGradient::AddNextMarker(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), 0.5f);
-    ImGradient::AddNextMarker(ImVec4(0.0f, 0.0f, 1.0f, 1.0f), 1.0f);
+    ImGradient::AddInitialMarker(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), 0.0f);
+    ImGradient::AddInitialMarker(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), 0.5f);
+    ImGradient::AddInitialMarker(ImVec4(0.0f, 0.0f, 1.0f, 1.0f), 1.0f);
     ImGradient::GradientPicker("Picker");
     ImGui::End();
 

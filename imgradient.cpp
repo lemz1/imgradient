@@ -22,6 +22,22 @@ static bool Marker(
     float       position,
     bool        is_selected);
 
+ImGradientContext* CreateContext()
+{
+  IM_ASSERT(!GImGradient);
+  GImGradient = IM_NEW(ImGradientContext)();
+  return GImGradient;
+}
+
+void DestroyContext()
+{
+  IM_ASSERT(GImGradient);
+  IM_DELETE(GImGradient);
+  GImGradient = NULL;
+}
+
+ImGradientContext* GetCurrentContext() { return GImGradient; }
+
 const ImVector<ImGradientMarker>& GradientPicker(const char* label, ImGradientPickerFlags flags)
 {
   ImGradientContext& g = *ImGradient::GetCurrentContext();
@@ -253,28 +269,12 @@ const ImVector<ImGradientMarker>& GradientPicker(const char* label, ImGradientPi
   return picker.Markers;
 }
 
-void AddNextMarker(ImVec4 color, float position)
+void AddInitialMarker(ImVec4 color, float position)
 {
   ImGradientContext& g = *ImGradient::GetCurrentContext();
 
   g.NextMarkers.push_back(ImGradientMarker{color, position});
 }
-
-ImGradientContext* CreateContext()
-{
-  IM_ASSERT(!GImGradient);
-  GImGradient = IM_NEW(ImGradientContext)();
-  return GImGradient;
-}
-
-void DestroyContext()
-{
-  IM_ASSERT(GImGradient);
-  IM_DELETE(GImGradient);
-  GImGradient = NULL;
-}
-
-ImGradientContext* GetCurrentContext() { return GImGradient; }
 
 ImGradientPicker& GetOrCreatePicker(ImGuiID id)
 {
