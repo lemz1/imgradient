@@ -46,7 +46,7 @@ const ImVector<ImGradientMarker>& GradientPicker(const char* label, ImGradientPi
   Gradient(d, gradient_rect);
 
   bool dragging_marker = false;
-  int  new_selected_idx = picker.SelectedIdx;
+  int  new_selected_idx = -1;
   for (int i = 0; i < picker.Markers.size(); i++)
   {
     if (i == picker.SelectedIdx)
@@ -71,10 +71,18 @@ const ImVector<ImGradientMarker>& GradientPicker(const char* label, ImGradientPi
   }
   ImGui::PopID();
 
-  if (!g.IsDraggingMarker)
+  if (!g.IsDraggingMarker && new_selected_idx != -1)
   {
-    picker.SelectedIdx = new_selected_idx;
-    g.IsDraggingMarker = dragging_marker;
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::GetIO().KeyCtrl &&
+        picker.Markers.size() > 1)
+    {
+      RemoveColor(new_selected_idx);
+    }
+    else if (!ImGui::GetIO().KeyCtrl)
+    {
+      picker.SelectedIdx = new_selected_idx;
+      g.IsDraggingMarker = dragging_marker;
+    }
   }
 
   if (g.IsDraggingMarker)
@@ -106,7 +114,19 @@ const ImVector<ImGradientMarker>& GradientPicker(const char* label, ImGradientPi
     }
   }
 
-  ImGui::ButtonBehavior(gradient_rect, g.CurrentPicker, NULL, NULL);
+  ImGui::ItemSize(ImVec2(gradient_size.x, gradient_size.y + marker_size.y * 0.5f));
+  ImGui::ItemAdd(gradient_rect, g.CurrentPicker);
+
+  bool hovered_gradient;
+  ImGui::ButtonBehavior(gradient_rect, g.CurrentPicker, &hovered_gradient, NULL);
+
+  if (hovered_gradient && !g.IsDraggingMarker && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
+      ImGui::GetIO().KeyShift)
+  {
+    float position = (ImGui::GetIO().MousePos.x - gradient_rect.Min.x) /
+                     (gradient_rect.Max.x - gradient_rect.Min.x);
+    AddColor(position);
+  }
 
   if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
   {
@@ -181,41 +201,70 @@ ImGradientPicker& GetCurrentPicker()
   return g.Pickers[picker_idx];
 }
 
-void AddColor()
+void AddColor(float position)
 {
   ImGradientPicker& picker = GetCurrentPicker();
 
   if (picker.Markers.size() == 1)
   {
-    const ImVec4& color = picker.Markers[picker.SelectedIdx].Color;
+    picker.Markers.push_back(ImGradientMarker{picker.Markers[0].Color, position});
+    picker.SelectedIdx = picker.Markers.size() - 1;
+    SortMarkers();
+    return;
   }
 
-  const ImVec4& color1 = picker.Markers[picker.SelectedIdx].Color;
-  float         position1 = picker.Markers[picker.SelectedIdx].Position;
+  ImVec4 color1;
+  float  position1;
+  ImVec4 color2;
+  float  position2;
+  int    insert_idx = -1;
+  for (int i = 0; i < picker.Markers.size(); i++)
+  {
+    if (i == 0 && picker.Markers[i].Position > position)
+    {
+      picker.Markers.insert(
+          picker.Markers.begin(), ImGradientMarker{picker.Markers[i].Color, position});
+      picker.SelectedIdx = 0;
+      return;
+    }
+    else if (i == picker.Markers.size() - 1 && picker.Markers[i].Position < position)
+    {
+      picker.Markers.push_back(ImGradientMarker{picker.Markers[i].Color, position});
+      picker.SelectedIdx = picker.Markers.size() - 1;
+      return;
+    }
 
-  const ImVec4& color2 = picker.SelectedIdx == 0 ? picker.Markers[picker.SelectedIdx + 1].Color
-                                                 : picker.Markers[picker.SelectedIdx - 1].Color;
-  float position2 = picker.SelectedIdx == 0 ? picker.Markers[picker.SelectedIdx + 1].Position
-                                            : picker.Markers[picker.SelectedIdx - 1].Position;
+    if (picker.Markers[i].Position > position)
+    {
+      color1 = picker.Markers[i - 1].Color;
+      position1 = picker.Markers[i - 1].Position;
+      color2 = picker.Markers[i].Color;
+      position2 = picker.Markers[i].Position;
+      insert_idx = i;
+      break;
+    }
+  }
 
-  ImVec4 insert_color = ImVec4(
-      color1.x - (color2.x - color1.x) * 0.5f,
-      color1.y - (color2.y - color1.y) * 0.5f,
-      color1.z - (color2.z - color1.z) * 0.5f,
-      color1.w - (color2.w - color1.w) * 0.5f);
-  float insert_position = position1 - (position2 - position1) * 0.5f;
+  IM_ASSERT(insert_idx != -1);
 
-  picker.Markers.insert(
-      picker.Markers.begin() + picker.SelectedIdx, ImGradientMarker{insert_color, insert_position});
+  float  color_t = (position - position1) / (position2 - position1);
+  ImVec4 color = ImVec4(
+      color1.x + (color2.x - color1.x) * color_t,
+      color1.y + (color2.y - color1.y) * color_t,
+      color1.z + (color2.z - color1.z) * color_t,
+      color1.w + (color2.w - color1.w) * color_t);
+
+  picker.Markers.insert(picker.Markers.begin() + insert_idx, ImGradientMarker{color, position});
+  picker.SelectedIdx = insert_idx;
 }
 
-void RemoveColor()
+void RemoveColor(int idx)
 {
   ImGradientPicker& picker = GetCurrentPicker();
 
   IM_ASSERT(picker.Markers.size() > 1);
 
-  picker.Markers.erase(picker.Markers.begin() + picker.SelectedIdx);
+  picker.Markers.erase(picker.Markers.begin() + idx);
 
   if (picker.SelectedIdx == picker.Markers.size())
   {
@@ -333,21 +382,23 @@ static bool Marker(
 
   if (is_selected)
   {
+    float line_offset = gradient_height * 0.15f;
+
     draw_list->AddLine(
         ImVec2(tri_p1.x, tri_p1.y),
-        ImVec2(center_x, tri_p1.y - 3.0f),
+        ImVec2(center_x, tri_p1.y - line_offset),
         IM_COL32(255, 255, 255, 255),
         thickness);
 
     draw_list->AddLine(
-        ImVec2(tri_p1.x, tri_p1.y - 6.0f),
-        ImVec2(center_x, tri_p1.y - 9.0f),
+        ImVec2(tri_p1.x, tri_p1.y - line_offset * 2.0f),
+        ImVec2(center_x, tri_p1.y - line_offset * 3.0f),
         IM_COL32(255, 255, 255, 255),
         thickness);
 
     draw_list->AddLine(
-        ImVec2(tri_p1.x, tri_p1.y - 12.0f),
-        ImVec2(center_x, tri_p1.y - 15.0f),
+        ImVec2(tri_p1.x, tri_p1.y - line_offset * 4.0f),
+        ImVec2(center_x, tri_p1.y - line_offset * 5.0f),
         IM_COL32(255, 255, 255, 255),
         thickness);
   }

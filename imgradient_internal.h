@@ -32,7 +32,7 @@ namespace ImGradient
 ImGradientPicker& GetOrCreatePicker(ImGuiID id);
 ImGradientPicker& GetCurrentPicker();
 
-void AddColor();
-void RemoveColor();
+void AddColor(float position);
+void RemoveColor(int idx);
 void SortMarkers();
 } // namespace ImGradient
