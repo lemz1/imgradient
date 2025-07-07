@@ -39,6 +39,11 @@ Alternatively, add ImGradient as a subdirectory and use the provided CMake setup
 Example:
 
 ```cpp
+// in initializer
+ImGradient::CreateContext();
+
+...
+// in render loop
 ImGradient::AddInitialMarker(ImVec4(1, 0, 0, 1), 0.0f);
 ImGradient::AddInitialMarker(ImVec4(0, 1, 0, 1), 0.5f);
 ImGradient::AddInitialMarker(ImVec4(0, 0, 1, 1), 1.0f);
